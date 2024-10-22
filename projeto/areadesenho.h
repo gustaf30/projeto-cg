@@ -1,20 +1,16 @@
 #ifndef AREADESENHO_H
 #define AREADESENHO_H
 
-#include <QWidget>
-#include <vector>
-#include <memory>
+#include <QFrame>
 #include "objetos.h"
 
-class AreaDesenho : public QWidget {
+class AreaDesenho : public QFrame {
     Q_OBJECT
-
 public:
-    std::vector<std::shared_ptr<Objeto>> objetos;
-
-    void adicionarObjeto(std::shared_ptr<Objeto> obj);
-
-protected:
+    QRect window;
+    QList<Objeto> displayFile;
+    QList<Objeto> listaWindow;
+    explicit AreaDesenho(QWidget *parent = nullptr);
     void paintEvent(QPaintEvent *event) override;
 };
 

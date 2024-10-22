@@ -2,25 +2,22 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include "areadesenho.h"
-#include <QPushButton>
 
-class MainWindow : public QMainWindow {
+QT_BEGIN_NAMESPACE
+namespace Ui {
+class MainWindow;
+}
+QT_END_NAMESPACE
+
+class MainWindow : public QMainWindow
+{
     Q_OBJECT
-
-private:
-    AreaDesenho *areaDesenho;
-    QPushButton *botaoDesenhar;
-    QPushButton *botaoDesenharLinha;
-    QPushButton *botaoDesenharQuadrado;
-
-private slots:
-    void desenharObjeto();
-    void desenharLinha();
-    void desenharQuadrado();
 
 public:
     MainWindow(QWidget *parent = nullptr);
-};
+    ~MainWindow();
 
+private:
+    Ui::MainWindow *ui;
+};
 #endif // MAINWINDOW_H

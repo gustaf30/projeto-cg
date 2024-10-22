@@ -11,8 +11,7 @@ CONFIG += c++17
 SOURCES += \
     areadesenho.cpp \
     main.cpp \
-    mainwindow.cpp \
-    objetos.cpp
+    mainwindow.cpp
 
 HEADERS += \
     areadesenho.h \

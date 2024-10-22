@@ -59,7 +59,7 @@ Q_CONSTINIT static const uint qt_meta_data_CLASSAreaDesenhoENDCLASS[] = {
 };
 
 Q_CONSTINIT const QMetaObject AreaDesenho::staticMetaObject = { {
-    QMetaObject::SuperData::link<QWidget::staticMetaObject>(),
+    QMetaObject::SuperData::link<QFrame::staticMetaObject>(),
     qt_meta_stringdata_CLASSAreaDesenhoENDCLASS.offsetsAndSizes,
     qt_meta_data_CLASSAreaDesenhoENDCLASS,
     qt_static_metacall,
@@ -89,12 +89,12 @@ void *AreaDesenho::qt_metacast(const char *_clname)
     if (!_clname) return nullptr;
     if (!strcmp(_clname, qt_meta_stringdata_CLASSAreaDesenhoENDCLASS.stringdata0))
         return static_cast<void*>(this);
-    return QWidget::qt_metacast(_clname);
+    return QFrame::qt_metacast(_clname);
 }
 
 int AreaDesenho::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
 {
-    _id = QWidget::qt_metacall(_c, _id, _a);
+    _id = QFrame::qt_metacall(_c, _id, _a);
     return _id;
 }
 QT_WARNING_POP
