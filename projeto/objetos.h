@@ -86,7 +86,9 @@ public:
     }
 
     //retangulo
-    Objeto(double _x1, double _y1, double _x2, double _y2, double _x3, double _y3, double _x4, double _y4) {
+    Objeto(QString _nome, double _x1, double _y1, double _x2, double _y2, double _x3, double _y3, double _x4, double _y4) {
+        this->nome = _nome;
+        this->tipo = "retangulo";
         Ponto pt(_x1, _y1);
         this->pontos.append(pt);
 
