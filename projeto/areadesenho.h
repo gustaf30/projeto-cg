@@ -7,11 +7,20 @@
 class AreaDesenho : public QFrame {
     Q_OBJECT
 public:
-    QRect window;
-    QList<Objeto> displayFile;
-    QList<Objeto> listaWindow;
+
+    QVector<Objeto> displayFile;
+    void preencherDisplayFile();
     explicit AreaDesenho(QWidget *parent = nullptr);
+    QPoint worldToViewport(double xw, double yw, const QRect& viewport);
+
+protected:
+
     void paintEvent(QPaintEvent *event) override;
+
+private:
+
+    QRect window;
+    QVector<Objeto> listaWindow;
 };
 
 #endif // AREADESENHO_H
