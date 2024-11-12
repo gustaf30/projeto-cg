@@ -1,12 +1,14 @@
 #include <QPainter>
 #include <QFrame>
+#include <QDebug>
 #include "areadesenho.h"
 
 AreaDesenho::AreaDesenho(QWidget *parent)
     : QFrame(parent) {
+    // Inicializa a janela e outros objetos
     window.setRect(960, 480, 900, 600); // Definindo a window
     preencherDisplayFile(); // Preenche o displayFile com objetos de teste
-    recalcularSCN(); // Inicializa listaWindow para primeira renderização
+    //recalcularSCN(); // Inicializa a listaWindow para primeira renderização
 }
 
 void AreaDesenho::preencherDisplayFile() {
@@ -40,12 +42,13 @@ void AreaDesenho::preencherDisplayFile() {
 }
 
 void AreaDesenho::transformarWindow(double fatorEscala, double deslocamentoX, double deslocamentoY) {
+    // Transformando a window de acordo com o fator de escala e deslocamento
     window.setWidth(window.width() * fatorEscala);
     window.setHeight(window.height() * fatorEscala);
     window.moveLeft(window.left() + deslocamentoX);
     window.moveTop(window.top() + deslocamentoY);
 
-    recalcularSCN(); // Recalcula SCN ao alterar a window
+    recalcularSCN(); // Recalcula SCN após modificar a window
     update(); // Redesenha a tela
 }
 
@@ -57,18 +60,20 @@ void AreaDesenho::transformarViewport(double fatorEscala, double deslocamentoX, 
             ponto.setY(ponto.y() * fatorEscala + deslocamentoY);
         }
     }
-    recalcularSCN();
-    update();
+    recalcularSCN(); // Recalcula SCN após modificar a viewport
+    update(); // Redesenha a tela
 }
 
 void AreaDesenho::recalcularSCN() {
     listaWindow.clear();
 
+    // Recalcular as coordenadas de todos os objetos com base nas transformações
     for (const Objeto& objeto : displayFile) {
         Objeto objetoViewport = objeto;
 
+        // Converter as coordenadas do objeto para a viewport
         for (Ponto& ponto : objetoViewport.pontos) {
-            QPoint pontoConvertido = worldToViewport(ponto.x(), ponto.y());
+            QPoint pontoConvertido = transformarWindowParaViewport(ponto.x(), ponto.y());
             ponto.setX(pontoConvertido.x());
             ponto.setY(pontoConvertido.y());
         }
@@ -77,12 +82,37 @@ void AreaDesenho::recalcularSCN() {
     }
 }
 
+QPoint AreaDesenho::transformarWindowParaViewport(double xw, double yw) {
+    // Coordenadas da janela (window)
+    double wxmin = 960;
+    double wymin = 480;
+    double wxmax = 1860;
+    double wymax = 1080;
+
+    // Coordenadas da viewport
+    double vxmin = 50;
+    double vymin = 50;
+    double vxmax = 450;
+    double vymax = 450;
+
+    // Normalizar as coordenadas da janela
+    double normalizedX = (xw - wxmin) / (wxmax - wxmin);
+    double normalizedY = (yw - wymin) / (wymax - wymin);
+
+    // Mapeando para a viewport
+    int xv = static_cast<int>(vxmin + normalizedX * (vxmax - vxmin));
+    int yv = static_cast<int>(vymin + normalizedY * (vymax - vymin));
+
+    return QPoint(xv, yv);
+}
+
 void AreaDesenho::paintEvent(QPaintEvent *event) {
     QFrame::paintEvent(event);
     QPainter painter(this);
 
     listaWindow.clear();  // Limpar lista de objetos convertidos
 
+    // Desenhar cada objeto da listaWindow após a conversão de coordenadas
     for (const Objeto& objeto : displayFile) {
         Objeto objetoModificado = objeto;
         objetoModificado.pontos.clear();  // Limpar pontos antigos para adicionar os transformados
@@ -91,7 +121,7 @@ void AreaDesenho::paintEvent(QPaintEvent *event) {
         for (const Ponto& ponto : objeto.pontos) {
             Ponto pontoModificado = ponto;
             if (objeto.nome != "window") {  // Somente converter se não for o objeto "window"
-                QPoint pontoConvertido = worldToViewport(ponto.x(), ponto.y());
+                QPoint pontoConvertido = transformarWindowParaViewport(ponto.x(), ponto.y());
                 pontoModificado.setX(pontoConvertido.x());
                 pontoModificado.setY(pontoConvertido.y());
             }
@@ -100,7 +130,7 @@ void AreaDesenho::paintEvent(QPaintEvent *event) {
         listaWindow.append(objetoModificado);
     }
 
-    // Desenhar cada objeto transformado
+    // Desenhar os objetos da listaWindow
     for (const Objeto& objeto : listaWindow) {
         if (objeto.tipo == "ponto") {
             painter.setPen(QPen(Qt::red, 2));
@@ -128,37 +158,6 @@ void AreaDesenho::paintEvent(QPaintEvent *event) {
                              objeto.pontos[0].x(), objeto.pontos[0].y());
         }
     }
-}
-
-QPoint AreaDesenho::worldToViewport(double xw, double yw) {
-    // Coordenadas e dimensões exatas da window
-    double wxmin = 960;
-    double wymin = 480;
-    double wxmax = 1860;
-    double wymax = 1080;
-
-    if (xw < wxmin || xw > wxmax || yw < wymin || yw > wymax) {
-        // Retorna um ponto fora da viewport para indicar que está fora da área visível
-        qDebug() << "Ponto fora da window:" << QPoint(-1, -1);
-        //return QPoint(-1, -1);  // Indica um ponto fora da viewport
-    }
-
-    // Coordenadas e dimensões exatas da viewport
-    double vxmin = 50;
-    double vymin = 50;
-    double vxmax = 450;
-    double vymax = 450;
-
-    double normalizedX = (xw - wxmin) / (wxmax - wxmin);
-    double normalizedY = (yw - wymin) / (wymax - wymin);
-    normalizedX = qBound(0.0, normalizedX, 1.0);
-    normalizedY = qBound(0.0, normalizedY, 1.0);
-
-    // Mapeamento de x e y de acordo com as proporções
-    int xv = static_cast<int>(vxmin + ((xw - wxmin) / (wxmax - wxmin)) * (vxmax - vxmin));
-    int yv = static_cast<int>(vymin + ((yw - wymin) / (wymax - wymin)) * (vymax - vymin));
-
-    return QPoint(xv, yv);
 }
 
 /*#include <QPainter>

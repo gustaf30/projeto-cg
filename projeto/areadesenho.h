@@ -16,6 +16,7 @@ public:
     void transformarViewport(double fatorEscala, double deslocamentoX, double deslocamentoY);
     void transformarWindow(double fatorEscala, double deslocamentoX, double deslocamentoY);
     void normalizarCoordenadas();
+    QPoint transformarWindowParaViewport(double xw, double yw);
 
 protected:
 
