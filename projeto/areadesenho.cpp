@@ -1,4 +1,4 @@
-#include <QPainter>
+/*#include <QPainter>
 #include <QFrame>
 #include <QDebug>
 #include "areadesenho.h"
@@ -102,6 +102,7 @@ QPoint AreaDesenho::transformarWindowParaViewport(double xw, double yw) {
     // Mapeando para a viewport
     int xv = static_cast<int>(vxmin + normalizedX * (vxmax - vxmin));
     int yv = static_cast<int>(vymin + normalizedY * (vymax - vymin));
+    qDebug() << "Coordenada convertida para viewport: (" << xv << "," << yv << ")";
 
     return QPoint(xv, yv);
 }
@@ -623,7 +624,7 @@ void AreaDesenho::paintEvent(QPaintEvent *event) {
         }
     }
 }
-
+*/
 #include "areadesenho.h"
 #include <QPainter>
 #include <QFrame>
@@ -662,7 +663,7 @@ void AreaDesenho::preencherDisplayFile() {
       <x>70</x>
       <y>10</y>
       <width>521</width>
-      <height>521</height>
+      <height>521</height>*/
 
     }
 }
@@ -703,7 +704,7 @@ void AreaDesenho::paintEvent(QPaintEvent *event) {
         }
         listaWindow.append(objetoModificado);
     }
-    /*for (const Objeto& objeto : displayFile) {
+    for (const Objeto& objeto : displayFile) {
         listaWindow.append(objeto);
         for (const Ponto& ponto : objeto.pontos) {
             Ponto pontoModificado = ponto;
@@ -743,7 +744,7 @@ void AreaDesenho::paintEvent(QPaintEvent *event) {
                              objeto.pontos[0].x(), objeto.pontos[0].y());
         }
     }
-}*/
+}
 /*void AreaDesenho::paintEvent(QPaintEvent *event) {
     QFrame::paintEvent(event);
     QPainter painter(this);
