@@ -11,7 +11,7 @@ public:
     QVector<Objeto> displayFile;
     void preencherDisplayFile();
     explicit AreaDesenho(QWidget *parent = nullptr);
-    QPoint worldToViewport(double xw, double yw, const QRect& viewport);
+    QPoint worldToViewport(double xw, double yw);
     void recalcularSCN();
     void transformarViewport(double fatorEscala, double deslocamentoX, double deslocamentoY);
     void transformarWindow(double fatorEscala, double deslocamentoX, double deslocamentoY);
