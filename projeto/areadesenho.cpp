@@ -1,812 +1,114 @@
-#include <QPainter>
-#include <QFrame>
-#include <QDebug>
 #include "areadesenho.h"
+#include <QPainter>
+#include <QPoint>
+#include <cmath>
 
 AreaDesenho::AreaDesenho(QWidget *parent)
-    : QFrame(parent) {
-    // Inicializa a janela e outros objetos
-    window.setRect(960, 480, 900, 600); // Definindo a window
-    preencherDisplayFile(); // Preenche o displayFile com objetos de teste
-    //recalcularSCN(); // Inicializa a listaWindow para primeira renderização
+    : QFrame(parent), window(0, 0, 900, 600), viewport(25, 25, 450, 450) {
 }
 
 void AreaDesenho::preencherDisplayFile() {
     if (displayFile.isEmpty()) {
-        // Criando objeto window
-        Objeto w;
-        w.nome = "window";
-        Ponto pw1(960, 480), pw2(1860, 480), pw3(1860, 1080), pw4(960, 1080);
-        w.pontos << pw1 << pw2 << pw3 << pw4;
+        Objeto vp;
+        vp.nome = "viewport";
+        Ponto pvp1(25, 25), pvp2(475, 25), pvp3(475, 475), pvp4(25, 475);
+        vp.pontos << pvp1 << pvp2 << pvp3 << pvp4;
 
-        // Criando viewport
-        Objeto viewport;
-        viewport.nome = "viewport";
-        viewport.pontos << Ponto(50, 50) << Ponto(450, 50) << Ponto(450, 450) << Ponto(50, 450);
+        Objeto l1("linha", 1000, 1000, 1200, 1200);
 
-        // Adicionando objetos de teste com coordenadas dobradas
-        Objeto l1, t1, r1;
-        l1.nome = "linha1";
-        t1.nome = "triangulo";
-        r1.nome = "retangulo";
-        l1.pontos << Ponto(0, 0) << Ponto(400, 400);
-        t1.pontos << Ponto(400, 400) << Ponto(1000, 400) << Ponto(700, 200);
-        r1.pontos << Ponto(200, 800) << Ponto(400, 800) << Ponto(400, 1000) << Ponto(200, 1000);
+        Objeto t1("triangulo", 1100, 1100, 1300, 1100, 1200, 900);
 
-        displayFile.append(w);
-        displayFile.append(viewport);
+        Objeto r1("retangulo", 1100, 1200, 1300, 1200, 1300, 1400, 1100, 1400);
+
+        displayFile.append(vp);
         displayFile.append(l1);
         displayFile.append(t1);
         displayFile.append(r1);
     }
 }
 
-void AreaDesenho::transformarWindow(double fatorEscala, double deslocamentoX, double deslocamentoY) {
-    // Transformando a window de acordo com o fator de escala e deslocamento
-    window.setWidth(window.width() * fatorEscala);
-    window.setHeight(window.height() * fatorEscala);
-    window.moveLeft(window.left() + deslocamentoX);
-    window.moveTop(window.top() + deslocamentoY);
-
-    recalcularSCN(); // Recalcula SCN após modificar a window
-    update(); // Redesenha a tela
-}
-
-void AreaDesenho::transformarViewport(double fatorEscala, double deslocamentoX, double deslocamentoY) {
-    // Transformação da viewport para verificar o efeito na área de desenho
-    for (Objeto& objeto : displayFile) {
-        for (Ponto& ponto : objeto.pontos) {
-            ponto.setX(ponto.x() * fatorEscala + deslocamentoX);
-            ponto.setY(ponto.y() * fatorEscala + deslocamentoY);
-        }
-    }
-    recalcularSCN(); // Recalcula SCN após modificar a viewport
-    update(); // Redesenha a tela
+QPoint AreaDesenho::worldToViewport(double xw, double yw) {
+    double x = (xw - window.left()) * viewport.width() / window.width() + viewport.left();
+    double y = (yw - window.top()) * viewport.height() / window.height() + viewport.top();
+    return QPoint(x, y);
 }
 
 void AreaDesenho::recalcularSCN() {
-    listaWindow.clear();
-
-    // Recalcular as coordenadas de todos os objetos com base nas transformações
-    for (const Objeto& objeto : displayFile) {
-        Objeto objetoViewport = objeto;
-
-        // Converter as coordenadas do objeto para a viewport
-        for (Ponto& ponto : objetoViewport.pontos) {
-            QPoint pontoConvertido = transformarWindowParaViewport(ponto.x(), ponto.y());
-            ponto.setX(pontoConvertido.x());
-            ponto.setY(pontoConvertido.y());
-        }
-
-        listaWindow.append(objetoViewport);
-    }
+    normalizarCoordenadas();
 }
 
-QPoint AreaDesenho::transformarWindowParaViewport(double xw, double yw) {
-    // Coordenadas da janela (window)
-    double wxmin = 960;
-    double wymin = 480;
-    double wxmax = 1860;
-    double wymax = 1080;
+void AreaDesenho::modificarWindow(double deslocamentoX, double deslocamentoY, double largura, double altura) {
+    window.moveTopLeft(QPoint(deslocamentoX, deslocamentoY));
+    window.setSize(QSize(largura, altura));
 
-    // Coordenadas da viewport
-    double vxmin = 50;
-    double vymin = 50;
-    double vxmax = 450;
-    double vymax = 450;
-
-    // Normalizar as coordenadas da janela
-    double normalizedX = (xw - wxmin) / (wxmax - wxmin);
-    double normalizedY = (yw - wymin) / (wymax - wymin);
-
-    // Mapeando para a viewport
-    int xv = static_cast<int>(vxmin + normalizedX * (vxmax - vxmin));
-    int yv = static_cast<int>(vymin + normalizedY * (vymax - vymin));
-
-    return QPoint(xv, yv);
-}
-
-void AreaDesenho::paintEvent(QPaintEvent *event) {
-    QFrame::paintEvent(event);
-    QPainter painter(this);
-
-    listaWindow.clear();  // Limpar lista de objetos convertidos
-
-    // Desenhar cada objeto da listaWindow após a conversão de coordenadas
-    for (const Objeto& objeto : displayFile) {
-        Objeto objetoModificado = objeto;
-        objetoModificado.pontos.clear();  // Limpar pontos antigos para adicionar os transformados
-
-        // Converter e adicionar cada ponto para a lista de pontos transformados
-        for (const Ponto& ponto : objeto.pontos) {
-            Ponto pontoModificado = ponto;
-            if (objeto.nome != "window") {  // Somente converter se não for o objeto "window"
-                QPoint pontoConvertido = transformarWindowParaViewport(ponto.x(), ponto.y());
-                pontoModificado.setX(pontoConvertido.x());
-                pontoModificado.setY(pontoConvertido.y());
-            }
-            objetoModificado.pontos.append(pontoModificado);
-        }
-        listaWindow.append(objetoModificado);
-    }
-
-    // Desenhar os objetos da listaWindow
-    for (const Objeto& objeto : listaWindow) {
-        if (objeto.tipo == "ponto") {
-            painter.setPen(QPen(Qt::red, 2));
-            painter.drawPoint(objeto.pontos[0].x(), objeto.pontos[0].y());
-        } else if (objeto.tipo == "linha") {
-            painter.setPen(QPen(Qt::green, 2));
-            painter.drawLine(objeto.pontos[0].x(), objeto.pontos[0].y(),
-                             objeto.pontos[1].x(), objeto.pontos[1].y());
-        } else if (objeto.tipo == "triangulo") {
-            painter.setPen(QPen(Qt::blue, 2));
-            for (int j = 0; j < objeto.pontos.size() - 1; j++) {
-                painter.drawLine(objeto.pontos[j].x(), objeto.pontos[j].y(),
-                                 objeto.pontos[j + 1].x(), objeto.pontos[j + 1].y());
-            }
-            painter.drawLine(objeto.pontos.last().x(), objeto.pontos.last().y(),
-                             objeto.pontos[0].x(), objeto.pontos[0].y());
-        } else if (objeto.tipo == "retangulo") {
-            painter.setPen(QPen(Qt::magenta, 2));
-            if (objeto.nome == "viewport") painter.setPen(QPen(Qt::black, 2));
-            for (int j = 0; j < objeto.pontos.size() - 1; j++) {
-                painter.drawLine(objeto.pontos[j].x(), objeto.pontos[j].y(),
-                                 objeto.pontos[j + 1].x(), objeto.pontos[j + 1].y());
-            }
-            painter.drawLine(objeto.pontos.last().x(), objeto.pontos.last().y(),
-                             objeto.pontos[0].x(), objeto.pontos[0].y());
-        }
-    }
-}
-
-/*#include <QPainter>
-#include <QFrame>
-#include "areadesenho.h"
-
-AreaDesenho::AreaDesenho(QWidget *parent)
-    : QFrame(parent) {
-    window.setRect(960, 480, 900, 600); // Definindo a window
-    preencherDisplayFile(); // Preenche o displayFile com objetos de teste
-    recalcularSCN(); // Inicializa listaWindow para primeira renderização
-}
-
-void AreaDesenho::preencherDisplayFile() {
-    if (displayFile.isEmpty()) {
-        // Criando objeto window
-        Objeto w;
-        w.nome = "window";
-        Ponto pw1(960, 480), pw2(1860, 480), pw3(1860, 1080), pw4(960, 1080);
-        w.pontos << pw1 << pw2 << pw3 << pw4;
-
-        // Criando viewport
-        Objeto viewport;
-        viewport.nome = "viewport";
-        viewport.pontos << Ponto(50, 50) << Ponto(450, 50) << Ponto(450, 450) << Ponto(50, 450);
-
-        // Adicionando objetos de teste com coordenadas dobradas
-        Objeto l1, t1, r1;
-        l1.nome = "linha1";
-        t1.nome = "triangulo";
-        r1.nome = "retangulo";
-        l1.pontos << Ponto(0, 0) << Ponto(400, 400);
-        t1.pontos << Ponto(400, 400) << Ponto(1000, 400) << Ponto(700, 200);
-        r1.pontos << Ponto(200, 800) << Ponto(400, 800) << Ponto(400, 1000) << Ponto(200, 1000);
-
-        displayFile.append(w);
-        displayFile.append(viewport);
-        displayFile.append(l1);
-        displayFile.append(t1);
-        displayFile.append(r1);
-    }
-}
-
-void AreaDesenho::transformarWindow(double fatorEscala, double deslocamentoX, double deslocamentoY) {
-    window.setWidth(window.width() * fatorEscala);
-    window.setHeight(window.height() * fatorEscala);
-    window.moveLeft(window.left() + deslocamentoX);
-    window.moveTop(window.top() + deslocamentoY);
-
-    recalcularSCN(); // Recalcula SCN ao alterar a window
-    update(); // Redesenha a tela
-}
-
-void AreaDesenho::transformarViewport(double fatorEscala, double deslocamentoX, double deslocamentoY) {
-    // Transformação da viewport para verificar o efeito na área de desenho
-    for (Objeto& objeto : displayFile) {
-        for (Ponto& ponto : objeto.pontos) {
-            ponto.setX(ponto.x() * fatorEscala + deslocamentoX);
-            ponto.setY(ponto.y() * fatorEscala + deslocamentoY);
-        }
-    }
     recalcularSCN();
     update();
 }
 
-void AreaDesenho::recalcularSCN() {
-    listaWindow.clear();
+void AreaDesenho::modificarViewport(double deslocamentoX, double deslocamentoY, double largura, double altura) {
+    viewport.moveTopLeft(QPoint(deslocamentoX, deslocamentoY));
+    viewport.setSize(QSize(largura, altura));
 
-    for (const Objeto& objeto : displayFile) {
-        Objeto objetoViewport = objeto;
-
-        for (Ponto& ponto : objetoViewport.pontos) {
-            QPoint pontoConvertido = worldToViewport(ponto.x(), ponto.y());
-            ponto.setX(pontoConvertido.x());
-            ponto.setY(pontoConvertido.y());
-        }
-
-        listaWindow.append(objetoViewport);
-    }
-}
-
-void AreaDesenho::paintEvent(QPaintEvent *event) {
-    QFrame::paintEvent(event);
-    QPainter painter(this);
-
-    listaWindow.clear();  // Limpar lista de objetos convertidos
-
-    for (const Objeto& objeto : displayFile) {
-        Objeto objetoModificado = objeto;
-        objetoModificado.pontos.clear();  // Limpar pontos antigos para adicionar os transformados
-
-        // Converter e adicionar cada ponto para a lista de pontos transformados
-        for (const Ponto& ponto : objeto.pontos) {
-            Ponto pontoModificado = ponto;
-            if (objeto.nome != "window") {  // Somente converter se não for o objeto "window"
-                QPoint pontoConvertido = worldToViewport(ponto.x(), ponto.y());
-                pontoModificado.setX(pontoConvertido.x());
-                pontoModificado.setY(pontoConvertido.y());
-            }
-            objetoModificado.pontos.append(pontoModificado);
-        }
-        listaWindow.append(objetoModificado);
-    }
-
-    // Desenhar cada objeto transformado
-    for (const Objeto& objeto : listaWindow) {
-        if (objeto.tipo == "ponto") {
-            painter.setPen(QPen(Qt::red, 2));
-            painter.drawPoint(objeto.pontos[0].x(), objeto.pontos[0].y());
-        } else if (objeto.tipo == "linha") {
-            painter.setPen(QPen(Qt::green, 2));
-            painter.drawLine(objeto.pontos[0].x(), objeto.pontos[0].y(),
-                             objeto.pontos[1].x(), objeto.pontos[1].y());
-        } else if (objeto.tipo == "triangulo") {
-            painter.setPen(QPen(Qt::blue, 2));
-            for (int j = 0; j < objeto.pontos.size() - 1; j++) {
-                painter.drawLine(objeto.pontos[j].x(), objeto.pontos[j].y(),
-                                 objeto.pontos[j + 1].x(), objeto.pontos[j + 1].y());
-            }
-            painter.drawLine(objeto.pontos.last().x(), objeto.pontos.last().y(),
-                             objeto.pontos[0].x(), objeto.pontos[0].y());
-        } else if (objeto.tipo == "retangulo") {
-            painter.setPen(QPen(Qt::magenta, 2));
-            if (objeto.nome == "viewport") painter.setPen(QPen(Qt::black, 2));
-            for (int j = 0; j < objeto.pontos.size() - 1; j++) {
-                painter.drawLine(objeto.pontos[j].x(), objeto.pontos[j].y(),
-                                 objeto.pontos[j + 1].x(), objeto.pontos[j + 1].y());
-            }
-            painter.drawLine(objeto.pontos.last().x(), objeto.pontos.last().y(),
-                             objeto.pontos[0].x(), objeto.pontos[0].y());
-        }
-    }
-}
-
-QPoint AreaDesenho::worldToViewport(double xw, double yw) {
-    // Coordenadas e dimensões exatas da window
-    double wxmin = 960;
-    double wymin = 480;
-    double wxmax = 1860;
-    double wymax = 1080;
-
-    if (xw < wxmin || xw > wxmax || yw < wymin || yw > wymax) {
-        // Retorna um ponto fora da viewport para indicar que está fora da área visível
-        qDebug() << "Ponto fora da window:" << QPoint(-1, -1);
-        //return QPoint(-1, -1);  // Indica um ponto fora da viewport
-    }
-
-    // Coordenadas e dimensões exatas da viewport
-    double vxmin = 50;
-    double vymin = 50;
-    double vxmax = 450;
-    double vymax = 450;
-
-    double normalizedX = (xw - wxmin) / (wxmax - wxmin);
-    double normalizedY = (yw - wymin) / (wymax - wymin);
-    normalizedX = qBound(0.0, normalizedX, 1.0);
-    normalizedY = qBound(0.0, normalizedY, 1.0);
-    //normalizedX = std::clamp(normalizedX, 0.0, 1.0);
-    //normalizedY = std::clamp(normalizedY, 0.0, 1.0);
-
-    // Mapeamento de x e y de acordo com as proporções
-    int xv = static_cast<int>(vxmin + ((xw - wxmin) * (vxmax - vxmin) / (wxmax - wxmin)));
-    int yv = static_cast<int>(vymax - ((yw - wymin) * (vymax - vymin) / (wymax - wymin)));
-
-    qDebug() << "Coordenada convertida para viewport: (" << xv << "," << yv << ")";
-    return QPoint(xv, yv);
-}
-
-
-/*#include <QPainter>
-#include <QFrame>
-#include "areadesenho.h"
-
-AreaDesenho::AreaDesenho(QWidget *parent)
-    : QFrame(parent) {
-    window.setRect(960, 480, 900, 600); // Definindo a window
-    preencherDisplayFile(); // Preenche o displayFile com objetos de teste
-    recalcularSCN(); // Inicializa listaWindow para primeira renderização
-}
-
-void AreaDesenho::preencherDisplayFile() {
-    if (displayFile.isEmpty()) {
-        // Criando objeto window
-        Objeto w;
-        w.nome = "window";
-        Ponto pw1(960, 480), pw2(1860, 480), pw3(1860, 1080), pw4(960, 1080);
-        w.pontos << pw1 << pw2 << pw3 << pw4;
-
-        // Criando viewport
-        Objeto viewport;
-        viewport.nome = "viewport";
-        viewport.pontos << Ponto(50, 50) << Ponto(450, 50) << Ponto(450, 450) << Ponto(50, 450);
-
-        // Adicionando objetos de teste com coordenadas dobradas
-        Objeto l1, /*l2("linha") t1, r1;
-        l1.nome = "linha1";
-        t1.nome = "triangulo";
-        r1.nome = "retangulo";
-        l1.pontos << Ponto(0, 0) << Ponto(400, 400);
-        //l2.pontos << Ponto(100, 520) << Ponto(100, 200);
-        t1.pontos << Ponto(400, 400) << Ponto(1000, 400) << Ponto(700, 200);
-        r1.pontos << Ponto(200, 800) << Ponto(400, 800) << Ponto(400, 1000) << Ponto(200, 1000);
-
-        displayFile.append(w);
-        displayFile.append(viewport);
-        displayFile.append(l1);
-        //displayFile.append(l2);
-        displayFile.append(t1);
-        displayFile.append(r1);
-    }
-}
-
-void AreaDesenho::transformarWindow(double fatorEscala, double deslocamentoX, double deslocamentoY) {
-    window.setWidth(window.width() * fatorEscala);
-    window.setHeight(window.height() * fatorEscala);
-    window.moveLeft(window.left() + deslocamentoX);
-    window.moveTop(window.top() + deslocamentoY);
-
-    recalcularSCN(); // Recalcula SCN ao alterar a window
-    update(); // Redesenha a tela
-}
-
-void AreaDesenho::transformarViewport(double fatorEscala, double deslocamentoX, double deslocamentoY) {
-    // Transformação da viewport para verificar o efeito na área de desenho
-    for (Objeto& objeto : displayFile) {
-        for (Ponto& ponto : objeto.pontos) {
-            ponto.setX(ponto.x() * fatorEscala + deslocamentoX);
-            ponto.setY(ponto.y() * fatorEscala + deslocamentoY);
-        }
-    }
-    recalcularSCN();
+    transformarWindowParaViewport(1.0, 1.0);
     update();
 }
 
-void AreaDesenho::recalcularSCN() {
-    listaWindow.clear();
-
-    for (const Objeto& objeto : displayFile) {
-        Objeto objetoViewport = objeto;
-
-        for (Ponto& ponto : objetoViewport.pontos) {
-            QPoint pontoConvertido = worldToViewport(ponto.x(), ponto.y());
-            ponto.setX(pontoConvertido.x());
-            ponto.setY(pontoConvertido.y());
-        }
-
-        listaWindow.append(objetoViewport);
-    }
-}
-
-
-void AreaDesenho::paintEvent(QPaintEvent *event) {
-    QFrame::paintEvent(event);
-    QPainter painter(this);
-
-    listaWindow.clear();  // Limpar lista de objetos convertidos
-
-    for (const Objeto& objeto : displayFile) {
-        Objeto objetoModificado = objeto;
-        objetoModificado.pontos.clear();  // Limpar pontos antigos para adicionar os transformados
-
-        // Converter e adicionar cada ponto para a lista de pontos transformados
-        for (const Ponto& ponto : objeto.pontos) {
-            Ponto pontoModificado = ponto;
-            if (objeto.nome != "window") {  // Somente converter se não for o objeto "window"
-                QPoint pontoConvertido = worldToViewport(ponto.x(), ponto.y());
-                pontoModificado.setX(pontoConvertido.x());
-                pontoModificado.setY(pontoConvertido.y());
-            }
-            objetoModificado.pontos.append(pontoModificado);
-        }
-        listaWindow.append(objetoModificado);
-    }
-
-    // Desenhar cada objeto transformado
-    for (const Objeto& objeto : listaWindow) {
-        if (objeto.tipo == "ponto") {
-            painter.setPen(QPen(Qt::red, 2));
-            painter.drawPoint(objeto.pontos[0].x(), objeto.pontos[0].y());
-        } else if (objeto.tipo == "linha") {
-            painter.setPen(QPen(Qt::green, 2));
-            painter.drawLine(objeto.pontos[0].x(), objeto.pontos[0].y(),
-                             objeto.pontos[1].x(), objeto.pontos[1].y());
-        } else if (objeto.tipo == "triangulo") {
-            painter.setPen(QPen(Qt::blue, 2));
-            for (int j = 0; j < objeto.pontos.size() - 1; j++) {
-                painter.drawLine(objeto.pontos[j].x(), objeto.pontos[j].y(),
-                                 objeto.pontos[j + 1].x(), objeto.pontos[j + 1].y());
-            }
-            painter.drawLine(objeto.pontos.last().x(), objeto.pontos.last().y(),
-                             objeto.pontos[0].x(), objeto.pontos[0].y());
-        } else if (objeto.tipo == "retangulo") {
-            painter.setPen(QPen(Qt::magenta, 2));
-            if (objeto.nome == "viewport") painter.setPen(QPen(Qt::black, 2));
-            for (int j = 0; j < objeto.pontos.size() - 1; j++) {
-                painter.drawLine(objeto.pontos[j].x(), objeto.pontos[j].y(),
-                                 objeto.pontos[j + 1].x(), objeto.pontos[j + 1].y());
-            }
-            painter.drawLine(objeto.pontos.last().x(), objeto.pontos.last().y(),
-                             objeto.pontos[0].x(), objeto.pontos[0].y());
+void AreaDesenho::normalizarCoordenadas() {
+    for (Objeto& obj : displayFile) {
+        for (Ponto& ponto : obj.pontos) {
+            ponto.setX(ponto.x() * 2);
+            ponto.setY(ponto.y() * 2);
         }
     }
-}
-
-
-
-QPoint AreaDesenho::worldToViewport(double xw, double yw) {
-    // Coordenadas e dimensões exatas da window
-    double wxmin = 960;
-    double wymin = 480;
-    double wxmax = 1860;
-    double wymax = 1080;
-    if (xw < wxmin || xw > wxmax || yw < wymin || yw > wymax) {
-        // Retorna um ponto fora da viewport para indicar que está fora da área visível
-        qDebug() << "Ponto fora da window:" << QPoint(-1, -1);
-        return QPoint(-1, -1);  // Indica um ponto fora da viewport
-    }
-    // Coordenadas e dimensões exatas da viewport
-    double vxmin = 50;
-    double vymin = 50;
-    double vxmax = 450;
-    double vymax = 450;
-
-
-    double normalizedX = (xw - wxmin) / (wxmax - wxmin);
-    double normalizedY = (yw - wymin) / (wymax - wymin);
-
-    normalizedX = std::clamp(normalizedX, 0.0, 1.0);
-    normalizedY = std::clamp(normalizedY, 0.0, 1.0);
-    // Mapeamento de x e y de acordo com as proporções
-    int xv = static_cast<int>(vxmin + ((xw - wxmin) * (vxmax - vxmin) / (wxmax - wxmin)));
-    int yv = static_cast<int>(vymax - ((yw - wymin) * (vymax - vymin) / (wymax - wymin)));
-    qDebug() << "Coordenada convertida para viewport: (" << xv << "," << yv << ")";
-    return QPoint(xv, yv);
-}
-
-
-
-
-
-/*#include "areadesenho.h"
-#include <QPainter>
-#include <QFrame>
-
-AreaDesenho::AreaDesenho(QWidget *parent)
-    : QFrame(parent) {
-    window.setRect(0, 0, 1, 1);  // Coordenadas normalizadas para a window
-    preencherDisplayFile();
     update();
 }
 
-void AreaDesenho::preencherDisplayFile() {
-    if (displayFile.isEmpty()) {
-        Objeto w;
-        Ponto pw1(0, 0), pw2(1, 0), pw3(1, 1), pw4(0, 1);
-        w.pontos << pw1 << pw2 << pw3 << pw4;
-        w.nome = "window";
-
-        Objeto viewport("viewport", 0.1, 0.1, 0.9, 0.1, 0.9, 0.9, 0.1, 0.9);
-        Objeto l1("linha 1", 0, 0, 0.5, 0.5), l2("linha 2", 0.1, 0.8, 0.1, 0.3);
-        Objeto t1("triangulo 1", 0.2, 0.2, 0.7, 0.2, 0.5, 0.1);
-        Objeto r1("retangulo 1", 0.1, 0.6, 0.3, 0.6, 0.3, 0.8, 0.1, 0.8);
-
-        displayFile.append(w);
-        displayFile.append(viewport);
-        displayFile.append(l1);
-        displayFile.append(l2);
-        displayFile.append(t1);
-        displayFile.append(r1);
+void AreaDesenho::transformarWindowParaViewport(double fatorEscalaX, double fatorEscalaY) {
+    for (Objeto& obj : displayFile) {
+        for (Ponto& ponto : obj.pontos) {
+            ponto.setX(ponto.x() * fatorEscalaX);
+            ponto.setY(ponto.y() * fatorEscalaY);
+        }
     }
-}
-
-QPoint AreaDesenho::worldToViewport(double xw, double yw) {
-    // Tamanhos da window e da viewport
-    double worldWidth = window.width();
-    double worldHeight = window.height();
-    double viewportWidth = this->width();
-    double viewportHeight = this->height();
-
-    // Ajustes de escala relativos da window para a viewport
-    double scaleX = viewportWidth / worldWidth;
-    double scaleY = viewportHeight / worldHeight;
-
-    // Calcula o ponto transformado na viewport
-    int xt = static_cast<int>((xw - window.left()) * scaleX);
-    int yt = static_cast<int>((yw - window.top()) * scaleY);
-
-    return QPoint(xt, yt);
-}
-
-
-void AreaDesenho::transformarWindow(double fatorEscala, double deslocamentoX, double deslocamentoY) {
-    window.setWidth(window.width() * fatorEscala);
-    window.setHeight(window.height() * fatorEscala);
-    window.moveLeft(window.left() + deslocamentoX);
-    window.moveTop(window.top() + deslocamentoY);
-    recalcularSCN();
     update();
 }
 
-void AreaDesenho::transformarViewport(double fatorEscala, double deslocamentoX, double deslocamentoY) {
-    int novaLargura = static_cast<int>(this->width() * fatorEscala);
-    int novaAltura = static_cast<int>(this->height() * fatorEscala);
-    this->resize(novaLargura, novaAltura);
-    this->move(this->x() + deslocamentoX, this->y() + deslocamentoY);
-    update();
-}
-
-void AreaDesenho::recalcularSCN() {
-    for (Objeto& objeto : displayFile) {
-        for (Ponto& ponto : objeto.pontos) {
-            ponto.setX((ponto.x() - window.left()) / window.width());
-            ponto.setY((ponto.y() - window.top()) / window.height());
-        }
-    }
-}
-
 void AreaDesenho::paintEvent(QPaintEvent *event) {
-    QFrame::paintEvent(event);
     QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
 
-    listaWindow.clear();
+    painter.setPen(Qt::blue);
+    painter.drawRect(viewport);
 
-    for (const Objeto& objeto : displayFile) {
-        Objeto objetoModificado = objeto;
-        for (const Ponto& ponto : objeto.pontos) {
-            Ponto pontoModificado = ponto;
-            if (objeto.nome != "window") {
-                QPoint pontoConvertido = worldToViewport(ponto.x(), ponto.y());
-                pontoModificado.setX(pontoConvertido.x());
-                pontoModificado.setY(pontoConvertido.y());
-            }
-            objetoModificado.pontos.append(pontoModificado);
+    QPen pen;
+    pen.setColor(Qt::black);
+    pen.setWidth(2);
+    painter.setPen(pen);
+
+    for (const Objeto& obj : displayFile) {
+        if (obj.pontos.size() < 2) {
+            continue;
         }
-        listaWindow.append(objetoModificado);
-    }
 
-    for (const Objeto& objeto : listaWindow) {
-        if (objeto.tipo == "ponto") {
-            painter.setPen(QPen(Qt::red, 2));
-            painter.drawPoint(objeto.pontos[0].x(), objeto.pontos[0].y());
-        } else if (objeto.tipo == "linha") {
-            painter.setPen(QPen(Qt::green, 2));
-            painter.drawLine(objeto.pontos[0].x(), objeto.pontos[0].y(),
-                             objeto.pontos[1].x(), objeto.pontos[1].y());
-        } else if (objeto.tipo == "triangulo") {
-            painter.setPen(QPen(Qt::blue, 2));
-            for (int j = 0; j < objeto.pontos.size() - 1; j++) {
-                painter.drawLine(objeto.pontos[j].x(), objeto.pontos[j].y(),
-                                 objeto.pontos[j + 1].x(), objeto.pontos[j + 1].y());
+        for (int i = 0; i < obj.pontos.size(); ++i) {
+            const Ponto& ponto = obj.pontos[i];
+            QPoint viewportPonto = worldToViewport(ponto.x(), ponto.y());
+
+            if (obj.pontos.size() == 1) {
+                painter.drawEllipse(viewportPonto, 3, 3);
             }
-            painter.drawLine(objeto.pontos.last().x(), objeto.pontos.last().y(),
-                             objeto.pontos[0].x(), objeto.pontos[0].y());
-        } else if (objeto.tipo == "retangulo") {
-            painter.setPen(QPen(Qt::magenta, 2));
-            if (objeto.nome == "viewport") painter.setPen(QPen(Qt::black, 2));
-            for (int j = 0; j < objeto.pontos.size() - 1; j++) {
-                painter.drawLine(objeto.pontos[j].x(), objeto.pontos[j].y(),
-                                 objeto.pontos[j + 1].x(), objeto.pontos[j + 1].y());
+
+            if (i < obj.pontos.size() - 1) {
+                const Ponto& proximoPonto = obj.pontos[i + 1];
+                QPoint viewportProximoPonto = worldToViewport(proximoPonto.x(), proximoPonto.y());
+                painter.drawLine(viewportPonto, viewportProximoPonto);
             }
-            painter.drawLine(objeto.pontos.last().x(), objeto.pontos.last().y(),
-                             objeto.pontos[0].x(), objeto.pontos[0].y());
+
+            if (i == obj.pontos.size() - 1 && obj.pontos.size() > 2) {
+                const Ponto& primeiroPonto = obj.pontos[0];
+                QPoint viewportPrimeiroPonto = worldToViewport(primeiroPonto.x(), primeiroPonto.y());
+                painter.drawLine(viewportPonto, viewportPrimeiroPonto);
+            }
         }
     }
 }
-
-#include "areadesenho.h"
-#include <QPainter>
-#include <QFrame>
-
-AreaDesenho::AreaDesenho(QWidget *parent)
-    : QFrame(parent) {
-    window.setRect(960, 480, 900, 600);
-    preencherDisplayFile();
-    update();
-}
-
-void AreaDesenho::preencherDisplayFile() {
-    if (displayFile.isEmpty()) {
-        Objeto w;
-        Ponto pw1(960, 480), pw2(1860, 480), pw3(1860, 1080), pw4(960, 1080);
-        w.pontos << pw1 << pw2 << pw3 << pw4;
-        w.nome = "window";
-
-        Objeto viewport("viewport", 50, 50, 450, 50, 450, 450, 50, 450);
-
-        Objeto //p1("ponto 1", 100, 300), p2("ponto 2", 190, 250),
-            l1("linha 1", 0, 0, 200, 200), l2("linha 2", 50, 260, 50, 100),
-            t1("triangulo 1", 200, 200, 500, 200, 350, 100),
-            r1("retangulo 1", 100, 400, 200, 400, 200, 500, 100, 500);
-
-        displayFile.append(w);
-        displayFile.append(viewport);
-        //displayFile.append(p1);
-        //displayFile.append(p2);
-        displayFile.append(l1);
-        displayFile.append(l2);
-        displayFile.append(t1);
-        displayFile.append(r1);
-        qDebug() << "Tamanho de displayFile após preenchimento:" << displayFile.size();
-        /*
-      <x>70</x>
-      <y>10</y>
-      <width>521</width>
-      <height>521</height>
-
-    }
-}
-QPoint AreaDesenho::worldToViewport(double xw, double yw) {
-    // Dimensões da window e da viewport
-    double worldWidth = window.width();
-    double worldHeight = window.height();
-    double viewportWidth = this->width();
-    double viewportHeight = this->height();
-
-    // Calcular fator de escala uniforme baseado na menor dimensão
-    double scale = std::min(viewportWidth / worldWidth, viewportHeight / worldHeight);
-
-    // Ajuste de posição e aplicação do fator de escala
-    int xt = static_cast<int>((xw - window.left()) * scale);
-    int yt = static_cast<int>((window.bottom() - yw) * scale);
-
-    return QPoint(xt, yt);
-}
-
-
-void AreaDesenho::paintEvent(QPaintEvent *event) {
-    QFrame::paintEvent(event);
-    QPainter painter(this);
-
-    listaWindow.clear();
-
-    for (const Objeto& objeto : displayFile) {
-        Objeto objetoModificado = objeto;
-        for (const Ponto& ponto : objeto.pontos) {
-            Ponto pontoModificado = ponto;
-            if (objeto.nome != "window") {
-                QPoint pontoConvertido = worldToViewport(ponto.x(), ponto.y());
-                pontoModificado.setX(pontoConvertido.x());
-                pontoModificado.setY(pontoConvertido.y());
-            }
-            objetoModificado.pontos.append(pontoModificado);
-        }
-        listaWindow.append(objetoModificado);
-    }
-    /*for (const Objeto& objeto : displayFile) {
-        listaWindow.append(objeto);
-        for (const Ponto& ponto : objeto.pontos) {
-            Ponto pontoModificado = ponto;
-            if (objeto.nome != "window") {
-                QPoint pontoConvertido = worldToViewport(ponto.x(), ponto.y());
-                pontoModificado.setX(pontoConvertido.x());
-                pontoModificado.setY(pontoConvertido.y());
-            }
-        }
-    }
-
-    // Desenha os objetos
-    for (const Objeto& objeto : listaWindow) {
-        if (objeto.tipo == "ponto") {
-            painter.setPen(QPen(Qt::red, 2));
-            painter.drawPoint(objeto.pontos[0].x(), objeto.pontos[0].y());
-        } else if (objeto.tipo == "linha") {
-            painter.setPen(QPen(Qt::green, 2));
-            painter.drawLine(objeto.pontos[0].x(), objeto.pontos[0].y(),
-                             objeto.pontos[1].x(), objeto.pontos[1].y());
-        } else if (objeto.tipo == "triangulo") {
-            painter.setPen(QPen(Qt::blue, 2));
-            for (int j = 0; j < objeto.pontos.size() - 1; j++) {
-                painter.drawLine(objeto.pontos[j].x(), objeto.pontos[j].y(),
-                                 objeto.pontos[j + 1].x(), objeto.pontos[j + 1].y());
-            }
-            painter.drawLine(objeto.pontos.last().x(), objeto.pontos.last().y(),
-                             objeto.pontos[0].x(), objeto.pontos[0].y());
-        } else if (objeto.tipo == "retangulo") {
-            painter.setPen(QPen(Qt::magenta, 2));
-            if (objeto.nome == "viewport") painter.setPen(QPen(Qt::black, 2));
-            for (int j = 0; j < objeto.pontos.size() - 1; j++) {
-                painter.drawLine(objeto.pontos[j].x(), objeto.pontos[j].y(),
-                                 objeto.pontos[j + 1].x(), objeto.pontos[j + 1].y());
-            }
-            painter.drawLine(objeto.pontos.last().x(), objeto.pontos.last().y(),
-                             objeto.pontos[0].x(), objeto.pontos[0].y());
-        }
-    }
-}*/
-/*void AreaDesenho::paintEvent(QPaintEvent *event) {
-    QFrame::paintEvent(event);
-    QPainter painter(this);
-
-    listaWindow.clear();
-
-    // Converter e adicionar objetos para exibição na viewport
-    for (const Objeto& objeto : displayFile) {
-        Objeto objetoModificado = objeto;
-        objetoModificado.pontos.clear();  // Certifique-se de não duplicar pontos
-
-        for (const Ponto& ponto : objeto.pontos) {
-            Ponto pontoModificado = ponto;
-            if (objeto.nome != "window") {
-                // Converter ponto do sistema de coordenadas da window para o da viewport
-                QPoint pontoConvertido = worldToViewport(ponto.x(), ponto.y());
-                pontoModificado.setX(pontoConvertido.x());
-                pontoModificado.setY(pontoConvertido.y());
-            }
-            objetoModificado.pontos.append(pontoModificado);
-        }
-        listaWindow.append(objetoModificado);
-    }
-
-    // Desenha os objetos
-    for (const Objeto& objeto : listaWindow) {
-        if (objeto.tipo == "ponto") {
-            painter.setPen(QPen(Qt::red, 2));
-            painter.drawPoint(objeto.pontos[0].x(), objeto.pontos[0].y());
-        } else if (objeto.tipo == "linha") {
-            painter.setPen(QPen(Qt::green, 2));
-            painter.drawLine(objeto.pontos[0].x(), objeto.pontos[0].y(),
-                             objeto.pontos[1].x(), objeto.pontos[1].y());
-        } else if (objeto.tipo == "triangulo") {
-            painter.setPen(QPen(Qt::blue, 2));
-            for (int j = 0; j < objeto.pontos.size() - 1; j++) {
-                painter.drawLine(objeto.pontos[j].x(), objeto.pontos[j].y(),
-                                 objeto.pontos[j + 1].x(), objeto.pontos[j + 1].y());
-            }
-            painter.drawLine(objeto.pontos.last().x(), objeto.pontos.last().y(),
-                             objeto.pontos[0].x(), objeto.pontos[0].y());
-        } else if (objeto.tipo == "retangulo") {
-            painter.setPen(QPen(Qt::magenta, 2));
-            if (objeto.nome == "viewport") painter.setPen(QPen(Qt::black, 2));
-            for (int j = 0; j < objeto.pontos.size() - 1; j++) {
-                painter.drawLine(objeto.pontos[j].x(), objeto.pontos[j].y(),
-                                 objeto.pontos[j + 1].x(), objeto.pontos[j + 1].y());
-            }
-            painter.drawLine(objeto.pontos.last().x(), objeto.pontos.last().y(),
-                             objeto.pontos[0].x(), objeto.pontos[0].y());
-        }
-    }
-}
-void AreaDesenho::paintEvent(QPaintEvent *event) {
-    QFrame::paintEvent(event);
-    QPainter painter(this);
-
-    // Teste com um ponto específico na origem da window
-    QPoint pontoViewport = worldToViewport(960, 480);  // Um ponto no centro da "window"
-    painter.setPen(QPen(Qt::red, 5));
-    painter.drawPoint(pontoViewport);
-
-    qDebug() << "Ponto convertido para viewport: " << pontoViewport;
-}*/
-
-

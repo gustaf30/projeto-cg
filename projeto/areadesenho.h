@@ -2,30 +2,31 @@
 #define AREADESENHO_H
 
 #include <QFrame>
+#include <QPainter>
+#include <QVector>
 #include "objetos.h"
+#include "matriz.h"
 
 class AreaDesenho : public QFrame {
     Q_OBJECT
 public:
-
     QVector<Objeto> displayFile;
-    void preencherDisplayFile();
+    QRect window;  // Janela de visualização
+    QRect viewport;  // Viewport de visualização
+
     explicit AreaDesenho(QWidget *parent = nullptr);
-    QPoint worldToViewport(double xw, double yw);
+
+    void preencherDisplayFile();
     void recalcularSCN();
-    void transformarViewport(double fatorEscala, double deslocamentoX, double deslocamentoY);
-    void transformarWindow(double fatorEscala, double deslocamentoX, double deslocamentoY);
+    void modificarWindow(double deslocamentoX, double deslocamentoY, double largura, double altura);
+    void modificarViewport(double deslocamentoX, double deslocamentoY, double largura, double altura);
+
+    QPoint worldToViewport(double xw, double yw);
+    void transformarWindowParaViewport(double fatorEscalaX, double fatorEscalaY);
     void normalizarCoordenadas();
-    QPoint transformarWindowParaViewport(double xw, double yw);
 
 protected:
-
     void paintEvent(QPaintEvent *event) override;
-
-private:
-
-    QRect window;
-    QVector<Objeto> listaWindow;
 };
 
 #endif // AREADESENHO_H

@@ -128,7 +128,6 @@ void MainWindow::aplicarMudancaAoObjeto(int indiceObjeto, int tipoTransformacao)
     }
 }
 
-
 MainWindow::~MainWindow()
 {
     delete ui;
